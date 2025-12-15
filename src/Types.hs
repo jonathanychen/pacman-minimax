@@ -1,0 +1,59 @@
+{-# LANGUAGE DeriveGeneric #-}
+
+module Types
+    ( Cell(..)
+    , Position
+    , Action(..)
+    , allActions
+    , GameState(..)
+    , StateKey(..)
+    ) where
+
+import qualified Data.Map.Strict as Map
+import Data.Vector (Vector)
+import Control.DeepSeq
+import GHC.Generics (Generic)
+import System.Random
+
+data Cell = Wall | Empty | Pellet
+    deriving (Eq, Show, Generic)
+
+instance NFData Cell
+
+type Position = (Int, Int)
+
+data Action = MoveUp | MoveDown | MoveLeft | MoveRight
+    deriving (Eq, Ord, Show, Enum, Bounded, Generic)
+
+instance NFData Action
+
+instance Random Action where
+    randomR (lo, hi) g =
+        let (i, g') = randomR (fromEnum lo, fromEnum hi) g
+        in (toEnum i, g')
+    random = randomR (minBound, maxBound)
+
+allActions :: [Action]
+allActions = [minBound .. maxBound]
+
+data GameState = GameState
+    { grid :: Vector (Vector Cell)
+    , pacmanPos :: Position
+    , ghostPositions :: [Position]
+    , score :: Int
+    , pelletsRemaining :: Int
+    , isTerminal :: Bool
+    , deathPos :: Maybe Position  
+    } deriving (Eq, Show, Generic)
+
+instance NFData GameState
+
+data StateKey = StateKey
+    {
+    skPacmanPos :: Position -- Pacman position
+    , pelletLeft :: Bool, pelletRight :: Bool, pelletUp :: Bool, pelletDown :: Bool -- Whether a pellet is left, right, up, down
+    , ghostLeft :: Bool, ghostRight :: Bool, ghostUp :: Bool, ghostDown :: Bool -- Whether a ghost is left, right, up, down
+    , wallLeft :: Bool, wallRight :: Bool, wallUp :: Bool, wallDown :: Bool -- Whether a wall is left, right, up, down
+    } deriving  (Eq, Ord, Show, Generic)
+
+instance NFData StateKey
