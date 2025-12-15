@@ -26,7 +26,7 @@ defaultConfig :: Config
 defaultConfig = Config
     { parallel = False
     , visualize = False
-    , gridFile = "grids/problem1.txt"
+    , gridFile = "grids/large.txt"
     , useGloss = False
     }
 
@@ -47,7 +47,7 @@ main = do
     initialState <- loadGrid (gridFile config)
 
     startTime <- getCurrentTime
-    let path = planPacmanPath initialState 10 200 (parallel config)
+    let path = planPacmanPath initialState 9 200 (parallel config)
     endTime <- path `deepseq` getCurrentTime
 
     let timeDiff = diffUTCTime endTime startTime

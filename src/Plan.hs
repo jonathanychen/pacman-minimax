@@ -7,13 +7,24 @@ import Types
 import Minimax
 import MinimaxParallel
 import qualified Data.Vector as V
+import Data.List (maximumBy)
+import Data.Ord (comparing)
 
 -- Choose the best Pacman action at a state using minimax.
 bestPacmanAction :: GameState -> Int -> Action
 bestPacmanAction gs depth =
-  let actions = legalActionsPacman gs
-      scored = [ (a, minimax (applyPacmanAction gs a) (depth - 1) minBound maxBound False) | a <- actions ]
-  in fst $ maximumByCmp snd scored
+  let g        = grid gs
+      ppos     = pacmanPos gs
+      actions  = legalActionsPacman gs
+      scored   = [ (a, minimax (applyPacmanAction gs a) (depth - 1) minBound maxBound False) | a <- actions ]
+      bestVal  = maximum (map snd scored)
+      candidates = [ a | (a, v) <- scored, v == bestVal ]
+      eatsPellet a =
+        let np = movePosition ppos a
+        in cellAt g np == Pellet
+  in case candidates of
+       [] -> head actions
+       _  -> maximumBy (comparing (\a -> if eatsPellet a then 1 :: Int else 0)) candidates
 
 -- Generate the sequence of GameStates for Pacman’s path until terminal.
 -- depth: minimax search depth per Pacman decision

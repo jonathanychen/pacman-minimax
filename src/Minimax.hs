@@ -64,7 +64,7 @@ evaluateGameState gs
   where
     terminalPenalty s =
         -- Strong penalty for death; mildly reward winning if pellets are zero.
-        if pelletsRemaining s == 0 then 10000 + score s * 100 else (-10000)
+        if pelletsRemaining s == 0 then 1000000 + score s * 100 else (-10000)
 
     dangerFromGhost d
         | d <= 0    = 5000   -- on same tile: immediate death threat
@@ -164,29 +164,96 @@ setCell :: Vector (Vector Cell) -> Position -> Cell -> Vector (Vector Cell)
 setCell g (x, y) c =
     g V.// [(y, (g V.! y) V.// [(x, c)])]
 
-manhattan :: Position -> Position -> Int
-manhattan (x1, y1) (x2, y2) = abs (x1 - x2) + abs (y1 - y2)
-
 -- Distances from Pacman to each ghost
 ghostDistances :: GameState -> [Int]
-ghostDistances gs = map (manhattan (pacmanPos gs)) (ghostPositions gs)
+ghostDistances gs =
+    let g   = grid gs
+        p   = pacmanPos gs
+        big = maxBound `div` 4
+    in [ maybe big id (bfsShortestDistance g p gp) | gp <- ghostPositions gs ]
 
 -- Distance from Pacman to the nearest pellet, if any
 nearestPelletDistance :: GameState -> Maybe Int
 nearestPelletDistance gs =
-    let g = grid gs
-        p = pacmanPos gs
-        ys = [0 .. V.length g - 1]
-        xsFor y = [0 .. V.length (g V.! y) - 1]
-        pelletPositions =
-            [ (x, y)
-            | y <- ys
-            , x <- xsFor y
-            , cellAt g (x, y) == Pellet
-            ]
-    in case pelletPositions of
-         [] -> Nothing
-         ps -> Just $ minimum (map (manhattan p) ps)
+    bfsNearestPelletDistance (grid gs) (pacmanPos gs)
+
+-- BFS to find the shortest number of steps from start to any Pellet cell.
+bfsNearestPelletDistance :: Vector (Vector Cell) -> Position -> Maybe Int
+bfsNearestPelletDistance g start
+  | not (inBounds g start) = Nothing
+  | otherwise =
+      let -- visited as a grid of Bool
+          h = V.length g
+          w = if h == 0 then 0 else V.length (g V.! 0)
+          visited0 = V.replicate h (V.replicate w False)
+
+          markVisited v (x, y) =
+            v V.// [(y, (v V.! y) V.// [(x, True)])]
+
+          isVisited v (x, y)
+            | y < 0 || y >= V.length v = True
+            | x < 0 || x >= V.length (v V.! y) = True
+            | otherwise = (v V.! y) V.! x
+
+          neighbors (x, y) = [(x+1,y),(x-1,y),(x,y+1),(x,y-1)]
+
+          -- simple list queue; fine for small/medium grids
+          go [] _ = Nothing
+          go ((p, d):qs) vis
+            | cellAt g p == Pellet = Just d
+            | otherwise =
+                let nexts =
+                      [ n
+                      | n <- neighbors p
+                      , inBounds g n
+                      , cellAt g n /= Wall
+                      , not (isVisited vis n)
+                      ]
+                    vis' = foldl markVisited vis nexts
+                    qs'  = qs ++ [ (n, d + 1) | n <- nexts ]
+                in go qs' vis'
+
+          visited1 = markVisited visited0 start
+      in go [(start, 0)] visited1
+
+-- BFS shortest path distance between two positions (avoids walls).
+bfsShortestDistance :: Vector (Vector Cell) -> Position -> Position -> Maybe Int
+bfsShortestDistance g start target
+  | not (inBounds g start)  = Nothing
+  | not (inBounds g target) = Nothing
+  | start == target         = Just 0
+  | otherwise =
+      let h = V.length g
+          w = if h == 0 then 0 else V.length (g V.! 0)
+          visited0 = V.replicate h (V.replicate w False)
+
+          markVisited v (x, y) =
+            v V.// [(y, (v V.! y) V.// [(x, True)])]
+
+          isVisited v (x, y)
+            | y < 0 || y >= V.length v = True
+            | x < 0 || x >= V.length (v V.! y) = True
+            | otherwise = (v V.! y) V.! x
+
+          neighbors (x, y) = [(x+1,y),(x-1,y),(x,y+1),(x,y-1)]
+
+          go [] _ = Nothing
+          go ((p, d):qs) vis
+            | p == target = Just d
+            | otherwise =
+                let nexts =
+                      [ n
+                      | n <- neighbors p
+                      , inBounds g n
+                      , cellAt g n /= Wall
+                      , not (isVisited vis n)
+                      ]
+                    vis' = foldl markVisited vis nexts
+                    qs'  = qs ++ [ (n, d + 1) | n <- nexts ]
+                in go qs' vis'
+
+          visited1 = markVisited visited0 start
+      in go [(start, 0)] visited1
 
 -- Cartesian product for a list of lists
 cartesian :: [[a]] -> [[a]]
