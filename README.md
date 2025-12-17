@@ -44,13 +44,44 @@ CLI options:
 
 Example:
 ```
-stack exec pacman-minimax-exe -- --par --visualize --grid grids/medium.txt
+stack exec pacman-minimax-exe -- --visualize --grid grids/medium.txt
 ```
 
 Multiple cores: try `+RTS -N`, e.g.:
 ```
 stack exec pacman-minimax-exe -- --par --grid grids/medium.txt +RTS -N
 ```
+
+## Benchmarks
+
+| # cores | time elapsed | speedup factor |
+| ------- | ------------ | -------------- |
+| 1       | 14.012       | 1              |
+| 2       | 12.158       | 1.152492186    |
+| 3       | 9.544        | 1.468147527    |
+| 4       | 7.227        | 1.938840459    |
+| 5       | 5.48         | 2.556934307    |
+| 6       | 4.987        | 2.809705234    |
+| 7       | 4.761        | 2.943079185    |
+| 8       | 4.733        | 2.960490175    |
+
+Run data regarding time and utilization were collected as follows:
+
+For one core:
+
+`stack exec pacman-minimax-exe -- --grid grids/large.txt --visualize`
+
+For 2-8 cores:
+
+`stack exec pacman-minimax-exe -- --grid grids/large.txt --par --visualize +RTS -N[num cores] -l`
+
+Timing information is printed to console before and after the visualization is finished.
+
+Seeing utilization in ThreadScope is just a matter of running:
+
+`threadscope pacman-minimax-exe.eventlog`
+
+After each run.
 
 ## Notes
 
