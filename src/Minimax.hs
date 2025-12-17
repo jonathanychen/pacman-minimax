@@ -6,8 +6,6 @@ module Minimax
 import Types
 import qualified Data.Vector as V
 import Data.Vector (Vector)
-import Data.List (minimumBy, maximumBy)
-import Data.Ord (comparing)
 
 -- Minimax with alpha-beta pruning.
 -- Arguments:
@@ -17,7 +15,6 @@ import Data.Ord (comparing)
 --   maximizingPlayer: True for Pacman, False for Ghosts
 minimax :: GameState -> Int -> Int -> Int -> Bool -> Int
 minimax gs depth alpha beta maximizingPlayer
-    -- Terminal or depth limit: evaluate
     | isTerminal gs || depth <= 0 = evaluateGameState gs
     | maximizingPlayer =
         let actions = legalActionsPacman gs
@@ -30,7 +27,7 @@ minimax gs depth alpha beta maximizingPlayer
               then evaluateGameState gs
               else goMin beta jointGhostMoves
   where
-    goMax a [] = a  -- Shouldn't happen with non-empty actions
+    goMax a [] = a 
     goMax a (act:rest) =
         let child = applyPacmanAction gs act
             val = minimax child (depth - 1) a beta False
@@ -39,7 +36,7 @@ minimax gs depth alpha beta maximizingPlayer
               then a'
               else goMax a' rest
 
-    goMin b [] = b  -- Shouldn't happen with non-empty actions
+    goMin b [] = b 
     goMin b (joint:rest) =
         let child = applyGhostJointActions gs joint
             val = minimax child (depth - 1) alpha b True
@@ -63,37 +60,30 @@ evaluateGameState gs
         in baseScore + pelletFactor + distToPelletW + ghostProxPen
   where
     terminalPenalty s =
-        -- Strong penalty for death; mildly reward winning if pellets are zero.
-        if pelletsRemaining s == 0 then 1000000 + score s * 100 else (-10000)
+        if pelletsRemaining s == 0 then 1000000 else (-10000)
 
     dangerFromGhost d
-        | d <= 0    = 5000   -- on same tile: immediate death threat
-        | d == 1    = 500    -- adjacent: high danger
+        | d <= 0    = 5000
+        | d == 1    = 500
         | d == 2    = 150
         | d == 3    = 50
         | otherwise = 10
 
--- =========================
--- Successor generation
--- =========================
+-- === Helpers === 
 
--- Legal Pacman actions (cannot move into a wall; must remain in bounds).
 legalActionsPacman :: GameState -> [Action]
 legalActionsPacman gs =
     filter (isLegalMove (grid gs) (pacmanPos gs)) allActions
 
--- Legal actions per ghost, returned as list aligned with ghostPositions.
 legalActionsPerGhost :: GameState -> [[Action]]
 legalActionsPerGhost gs =
     map (\pos -> filter (isLegalMove (grid gs) pos) allActions) (ghostPositions gs)
 
--- Cartesian product of ghost action lists to form joint actions.
 legalJointGhostActions :: GameState -> [[Action]]
 legalJointGhostActions gs =
     let perGhost = legalActionsPerGhost gs
     in cartesian perGhost
 
--- Apply a Pacman action to produce a successor GameState.
 applyPacmanAction :: GameState -> Action -> GameState
 applyPacmanAction gs act =
     let g        = grid gs
@@ -117,7 +107,6 @@ applyPacmanAction gs act =
           , deathPos         = deathP
           }
 
--- Apply a joint list of ghost actions (one per ghost).
 applyGhostJointActions :: GameState -> [Action] -> GameState
 applyGhostJointActions gs acts =
     let g           = grid gs
@@ -133,10 +122,6 @@ applyGhostJointActions gs acts =
           , isTerminal     = terminal
           , deathPos       = deathP
           }
-
--- =========================
--- Utilities
--- =========================
 
 movePosition :: Position -> Action -> Position
 movePosition (x, y) act = case act of
@@ -164,7 +149,6 @@ setCell :: Vector (Vector Cell) -> Position -> Cell -> Vector (Vector Cell)
 setCell g (x, y) c =
     g V.// [(y, (g V.! y) V.// [(x, c)])]
 
--- Distances from Pacman to each ghost
 ghostDistances :: GameState -> [Int]
 ghostDistances gs =
     let g   = grid gs
@@ -177,12 +161,11 @@ nearestPelletDistance :: GameState -> Maybe Int
 nearestPelletDistance gs =
     bfsNearestPelletDistance (grid gs) (pacmanPos gs)
 
--- BFS to find the shortest number of steps from start to any Pellet cell.
 bfsNearestPelletDistance :: Vector (Vector Cell) -> Position -> Maybe Int
 bfsNearestPelletDistance g start
   | not (inBounds g start) = Nothing
   | otherwise =
-      let -- visited as a grid of Bool
+      let
           h = V.length g
           w = if h == 0 then 0 else V.length (g V.! 0)
           visited0 = V.replicate h (V.replicate w False)
@@ -197,7 +180,6 @@ bfsNearestPelletDistance g start
 
           neighbors (x, y) = [(x+1,y),(x-1,y),(x,y+1),(x,y-1)]
 
-          -- simple list queue; fine for small/medium grids
           go [] _ = Nothing
           go ((p, d):qs) vis
             | cellAt g p == Pellet = Just d
@@ -216,7 +198,6 @@ bfsNearestPelletDistance g start
           visited1 = markVisited visited0 start
       in go [(start, 0)] visited1
 
--- BFS shortest path distance between two positions (avoids walls).
 bfsShortestDistance :: Vector (Vector Cell) -> Position -> Position -> Maybe Int
 bfsShortestDistance g start target
   | not (inBounds g start)  = Nothing
@@ -255,7 +236,6 @@ bfsShortestDistance g start target
           visited1 = markVisited visited0 start
       in go [(start, 0)] visited1
 
--- Cartesian product for a list of lists
 cartesian :: [[a]] -> [[a]]
 cartesian [] = [[]]
 cartesian (xs:xss) = [ x:ys | x <- xs, ys <- cartesian xss ]

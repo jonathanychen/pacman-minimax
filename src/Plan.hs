@@ -23,7 +23,7 @@ bestPacmanAction gs depth =
         let np = movePosition ppos a
         in cellAt g np == Pellet
   in case candidates of
-       [] -> head actions
+       [] -> head actions -- this is okay, there is always at least one legal action
        _  -> maximumBy (comparing (\a -> if eatsPellet a then 1 :: Int else 0)) candidates
 
 -- Generate the sequence of GameStates for Pacman’s path until terminal.
@@ -35,7 +35,7 @@ planPacmanPath start depth maxSteps useParallel = go start 0
     go gs n
       | isTerminal gs || n >= maxSteps = [gs]
       | useParallel =
-          let a    = bestPacmanActionPar gs depth 2 -- use 2 levels of parallelism
+          let a    = bestPacmanActionPar gs depth 3 -- use 3 levels of parallelism
               pac' = applyPacmanAction gs a
               gh'  = stepGhostsGreedy pac'
           in gs : go gh' (n + 1)
@@ -45,11 +45,7 @@ planPacmanPath start depth maxSteps useParallel = go start 0
               gh'  = stepGhostsGreedy pac'
           in gs : go gh' (n + 1)
 
--- =========== Helpers (reuse same conventions as Minimax.hs) ===========
-
-maximumByCmp :: Ord b => (a -> b) -> [a] -> a
-maximumByCmp f (x:xs) = foldl (\best y -> if f y > f best then y else best) x xs
-maximumByCmp _ []     = error "maximumByCmp: empty list"
+-- === Helpers ===
 
 movePosition :: Position -> Action -> Position
 movePosition (x, y) act = case act of
@@ -73,11 +69,9 @@ isLegalMove g pos act =
   let np = movePosition pos act
   in inBounds g np && cellAt g np /= Wall
 
--- Legal Pacman actions
 legalActionsPacman :: GameState -> [Action]
 legalActionsPacman gs = filter (isLegalMove (grid gs) (pacmanPos gs)) allActions
 
--- Apply Pacman action (same logic as in Minimax.hs)
 applyPacmanAction :: GameState -> Action -> GameState
 applyPacmanAction gs act =
   let g        = grid gs
@@ -112,9 +106,9 @@ stepGhostsGreedy gs
                 nexts = [ (movePosition pos a, a) | a <- acts ]
                 -- Look up BFS distance for each candidate next position; prefer smaller distances.
                 -- If unreachable (Nothing), treat as large number to avoid.
-                score np = maybe big id (distanceAt distGrid np)
+                scoreOf np = maybe big id (getDistance distGrid np)
                 big      = maxBound `div` 4
-                best     = minimumByCmp (\(np, _) -> score np) nexts
+                best     = minimumByCmp (\(np, _) -> scoreOf np) nexts
             in fst best
           movedGhosts = map choose (ghostPositions gs)
           collided    = ppos `elem` movedGhosts
@@ -131,7 +125,7 @@ bfsDistances g start =
   let h = V.length g
       w = if h == 0 then 0 else V.length (g V.! 0)
       initGrid = V.replicate h (V.replicate w Nothing)
-      enqueue q x = q ++ [x]  -- simple list queue; for bigger boards use Seq
+      enqueue q x = q ++ [x]
       neighbors (x, y) =
         [ (x+1,y), (x-1,y), (x,y+1), (x,y-1) ]
         |> filter (inBounds g)
@@ -140,32 +134,30 @@ bfsDistances g start =
         case q of
           [] -> dgrid
           (p:qs) ->
-            let curD = maybe 0 id (distanceAt dgrid p)
+            let curD = maybe 0 id (getDistance dgrid p)
                 ns   = neighbors p
                 (qs', dgrid') =
                   foldl
                     (\(accQ, accG) n ->
-                       case distanceAt accG n of
-                         Just _  -> (accQ, accG)      -- already visited
+                       case getDistance accG n of
+                         Just _  -> (accQ, accG)
                          Nothing ->
-                           let accG' = writeDistance accG n (curD + 1)
+                           let accG' = setDistance accG n (curD + 1)
                            in (enqueue accQ n, accG'))
                     (qs, dgrid)
                     ns
             in go qs' dist dgrid'
-      dgrid0 = writeDistance initGrid start 0
-  in go [start] 0 dgrid0
+      dgrid0 = setDistance initGrid start 0
+  in go [start] (0 :: Int) dgrid0
 
--- Read distance at a position from the distance grid.
-distanceAt :: V.Vector (V.Vector (Maybe Int)) -> Position -> Maybe Int
-distanceAt dg (x, y)
+getDistance :: V.Vector (V.Vector (Maybe Int)) -> Position -> Maybe Int
+getDistance dg (x, y)
   | y < 0 || y >= V.length dg = Nothing
   | x < 0 || x >= V.length (dg V.! y) = Nothing
   | otherwise = (dg V.! y) V.! x
 
--- Write a distance at a position.
-writeDistance :: V.Vector (V.Vector (Maybe Int)) -> Position -> Int -> V.Vector (V.Vector (Maybe Int))
-writeDistance dg (x, y) d =
+setDistance :: V.Vector (V.Vector (Maybe Int)) -> Position -> Int -> V.Vector (V.Vector (Maybe Int))
+setDistance dg (x, y) d =
   dg V.// [(y, (dg V.! y) V.// [(x, Just d)])]
 
 -- Simple pipe operator for readability.
@@ -175,6 +167,3 @@ writeDistance dg (x, y) d =
 minimumByCmp :: Ord b => (a -> b) -> [a] -> a
 minimumByCmp f (x:xs) = foldl (\best y -> if f y < f best then y else best) x xs
 minimumByCmp _ []     = error "minimumByCmp: empty list"
-
-manhattan :: Position -> Position -> Int
-manhattan (x1, y1) (x2, y2) = abs (x1 - x2) + abs (y1 - y2)

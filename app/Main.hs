@@ -1,15 +1,10 @@
-module Main where
+module Main (main) where
 
-import Types
 import Game
 import Plan
 import System.Environment (getArgs)
-import System.CPUTime
-import Data.Time.Clock (getCurrentTime, UTCTime, diffUTCTime)
+import Data.Time.Clock (getCurrentTime, diffUTCTime)
 import Text.Printf
-import qualified Data.Map.Strict as Map
-import qualified Data.Vector as V
-import qualified Control.Concurrent
 import Control.DeepSeq (deepseq)
     
 data RunMode = Minimax
@@ -43,7 +38,6 @@ main = do
     printf "  Use Gloss: %s\n" (show $ useGloss config)
     printf "  Grid file: %s\n" (gridFile config)
 
-    -- Load game state
     initialState <- loadGrid (gridFile config)
 
     startTime <- getCurrentTime
@@ -57,7 +51,6 @@ main = do
 
     printf "Planning completed in %.3f seconds.\n" (realToFrac timeDiff :: Double)
 
--- Parse command line arguments
 parseArgs :: [String] -> Config -> IO Config
 parseArgs [] cfg = return cfg
 parseArgs ("--par":rest) cfg = parseArgs rest cfg { parallel = True }

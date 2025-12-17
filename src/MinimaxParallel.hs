@@ -7,7 +7,7 @@ import Types
 import Minimax (minimax, evaluateGameState)
 import qualified Data.Vector as V
 import Control.Parallel.Strategies (parMap, rdeepseq)
-import Data.List (minimumBy, maximumBy)
+import Data.List (maximumBy)
 import Data.Ord (comparing)
 
 -- Parallelized minimax (siblings evaluated concurrently).
@@ -19,7 +19,7 @@ import Data.Ord (comparing)
 minimaxPar :: GameState -> Int -> Int -> Int -> Int -> Bool -> Int
 minimaxPar gs depth parLevels alpha beta maximizingPlayer
     | isTerminal gs || depth <= 0 = evaluateGameState gs
-    | parLevels >= 0 && maximizingPlayer =
+    | parLevels > 0 && maximizingPlayer =
       let actions = legalActionsPacman gs
       in case actions of
            [] -> evaluateGameState gs
@@ -27,7 +27,7 @@ minimaxPar gs depth parLevels alpha beta maximizingPlayer
                 let children = [ applyPacmanAction gs a | a <- actions ]
                     vals     = parMap rdeepseq (\c -> minimaxPar c (depth - 1) (parLevels - 1) alpha beta False) children
                 in maximum vals
-    | parLevels >= 0 && not maximizingPlayer =
+    | parLevels > 0 && not maximizingPlayer =
       let jointGhostMoves = legalJointGhostActions gs
       in case jointGhostMoves of
            [] -> evaluateGameState gs
@@ -35,21 +35,15 @@ minimaxPar gs depth parLevels alpha beta maximizingPlayer
                 let children = [ applyGhostJointActions gs jm | jm <- jointGhostMoves ]
                     vals     = parMap rdeepseq (\c -> minimaxPar c (depth - 1) (parLevels - 1) alpha beta True) children
                 in minimum vals
-    | parLevels < 0 && maximizingPlayer = minimax gs depth alpha beta True
-    | parLevels < 0 && not maximizingPlayer = minimax gs depth alpha beta False
-    | otherwise = error "Should not be possible"
+    | otherwise = minimax gs depth alpha beta maximizingPlayer 
 
-
--- Choose Pacman's best action using parallel evaluation of successors.
 bestPacmanActionPar :: GameState -> Int -> Int -> Action
 bestPacmanActionPar gs depth parLevels =
   let actions = legalActionsPacman gs
       scored  = parMap rdeepseq (\a -> (a, minimaxPar (applyPacmanAction gs a) (depth - 1) parLevels minBound maxBound False)) actions
   in fst $ maximumBy (comparing snd) scored
 
--- =========================
--- Successor generation
--- =========================
+-- === Helpers ===
 
 legalActionsPacman :: GameState -> [Action]
 legalActionsPacman gs =
@@ -99,10 +93,6 @@ applyGhostJointActions gs acts =
         , isTerminal     = terminal
         , deathPos       = deathP
         }
-
--- =========================
--- Utilities
--- =========================
 
 movePosition :: Position -> Action -> Position
 movePosition (x, y) act = case act of
