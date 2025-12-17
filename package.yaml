@@ -7,7 +7,6 @@ maintainer:          "jyc2183@columbia.edu, kjw2169@columbia.edu"
 
 extra-source-files:
 - README.md
-- CHANGELOG.md
 
 description:         Please see the README on GitHub at <https://github.com/jonathanychen/pacman-minimax#readme>
 

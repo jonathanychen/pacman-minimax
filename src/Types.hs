@@ -9,7 +9,6 @@ module Types
     , StateKey(..)
     ) where
 
-import qualified Data.Map.Strict as Map
 import Data.Vector (Vector)
 import Control.DeepSeq
 import GHC.Generics (Generic)
